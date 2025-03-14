@@ -20,6 +20,8 @@ const Map = () => {
         // const infowindow = new window.kakao.maps.InfoWindow({ zIndex: 1 });
         let bankMarkers: any[] = [];
         let bankOverlays: any[] = [];
+        let storeMarkers: any[] = [];
+        let storeOverlays: any[] = [];
         let currentInfoOverlay: any = null;
 
         if (navigator.geolocation) {
@@ -31,13 +33,16 @@ const Map = () => {
                     displayUserMarker(locPosition);
                     map.setCenter(locPosition);
                     searchBanks(map);
+                    searchStores(map);
                 },
                 () => {
                     searchBanks(map);
+                    searchStores(map);
                 }
             );
         } else {
             searchBanks(map);
+            searchStores(map);
         }
 
         function displayUserMarker(locPosition: any) {
@@ -160,8 +165,97 @@ const Map = () => {
             }
         }
 
+        function searchStores(map: any) {
+            const ps = new window.kakao.maps.services.Places(map);
+            ps.categorySearch("CS2", storesSearchCB, { useMapBounds: true });
+        }
+
+        function storesSearchCB(data: any, status: any) {
+            if (status === window.kakao.maps.services.Status.OK) {
+                clearStoreMarkers();
+                for (let i = 0; i < data.length; i++) {
+                    displayStoreMarker(data[i]);
+                }
+            }
+        }
+
+        function displayStoreMarker(place: any) {
+            const markerPosition = new window.kakao.maps.LatLng(place.y, place.x);
+
+            const markerElement = document.createElement("div");
+            markerElement.className = "store-marker-container";
+            markerElement.innerHTML = `
+                <div class="store-marker">
+                    <span class="store-icon"></span>
+                </div>
+            `;
+
+            const markerOverlay = new window.kakao.maps.CustomOverlay({
+                position: markerPosition,
+                content: markerElement,
+                yAnchor: 1,
+                zIndex: 1
+            });
+
+            markerOverlay.setMap(map);
+            storeOverlays.push(markerOverlay);
+
+            let storeName = place.place_name;
+            if (storeName.length > 20) {
+                storeName = storeName.substring(0, 19) + '...';
+            }
+
+            const infoContent = document.createElement("div");
+            infoContent.className = "store-info-overlay";
+            infoContent.innerHTML = `
+                <div class="info-window">
+                    <div class="info-content">
+                        <div class="title">
+                            <span class="store-name">${storeName}</span>
+                            <div class="close" onclick="this.parentElement.parentElement.parentElement.parentElement.style.display='none'" title="닫기">×</div>
+                        </div>
+                        <div class="body">
+                            <div class="desc">
+                                <div class="ellipsis">${place.address_name}</div>
+                                <div class="phone">${place.phone || '전화번호 정보 없음'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-tail"></div>
+                </div>
+            `;
+
+            const infoOverlay = new window.kakao.maps.CustomOverlay({
+                content: infoContent,
+                position: markerPosition,
+                yAnchor: 1.5,
+                zIndex: 2
+            });
+
+            markerElement.addEventListener('click', function() {
+                if (currentInfoOverlay) {
+                    currentInfoOverlay.setMap(null);
+                }
+                infoOverlay.setMap(map);
+                currentInfoOverlay = infoOverlay;
+            });
+        }
+
+        function clearStoreMarkers() {
+            for (let overlay of storeOverlays) {
+                overlay.setMap(null);
+            }
+            storeOverlays = [];
+
+            for (let marker of storeMarkers) {
+                marker.setMap(null);
+            }
+            storeMarkers = [];
+        }
+
         window.kakao.maps.event.addListener(map, "dragend", () => {
             searchBanks(map);
+            searchStores(map);
         });
 
         // 지도 클릭 시 열려있는 오버레이 닫기
@@ -301,6 +395,26 @@ const Map = () => {
                     @keyframes waveEffect {
                         0% { transform: scale(1); opacity: 0.7; }
                         100% { transform: scale(2); opacity: 0; }
+                    }
+                    .store-marker-container {
+                        cursor: pointer;
+                    }
+                    .store-marker {
+                        width: 24px;
+                        height: 24px;
+                        background-color: #28A745;
+                        border-radius: 50%;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+                    }
+                    .store-icon {
+                        display: block;
+                        width: 14px;
+                        height: 14px;
+                        background-color: white;
+                        clip-path: polygon(20% 0%, 80% 0%, 100% 100%, 0% 100%);
                     }
                 `}
             </style>
